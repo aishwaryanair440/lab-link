@@ -769,19 +769,24 @@ function handleLogin(role, id) {
 
 function normalizeEquipmentIdFromBarcode(scannedId) {
   if (!scannedId) return "";
-  var searchId = scannedId.toString().trim().toLowerCase();
+  var rawInput = scannedId.toString().trim();
+  var searchId = rawInput.toLowerCase();
   
-  // 1. Try mapping from the Barcode Spreadsheet
+  var resolvedIdCandidate = rawInput; // Start with the input itself
+
+  // 1. Resolve from the Barcode Spreadsheet first
   try {
     var barcodeSS = getBarcodeSpreadsheet();
     if (barcodeSS) {
       var sheet = barcodeSS.getSheets()[0];
       var data = sheet.getDataRange().getValues();
       for (var i = 1; i < data.length; i++) {
-        // Check Barcode (col 0), ID (col 1), or any other potential ID column
+        // Search across all common identifier columns (Barcode, ID, or Name)
         if ((data[i][0] && data[i][0].toString().trim().toLowerCase() === searchId) || 
             (data[i][1] && data[i][1].toString().trim().toLowerCase() === searchId)) {
-           return data[i][0]; // Returns actual equipment ID
+           // If match found, use column B (index 1) as the likely ID, otherwise col A
+           resolvedIdCandidate = (data[i][1] || data[i][0]).toString().trim();
+           break; 
         }
       }
     }
@@ -789,22 +794,24 @@ function normalizeEquipmentIdFromBarcode(scannedId) {
     Logger.log("Barcode spreadsheet access error: " + e);
   }
 
-  // 2. Try direct match or name match in the Main Spreadsheet
+  // 2. Final Resolution: Map whatever we have (ID or Name) to the Primary ID in Main Sheet
   var ss = getSpreadsheet();
   var equipSheet = ss.getSheetByName("Equipment");
   var equipData = equipSheet.getDataRange().getValues();
   
+  var candidateLower = resolvedIdCandidate.toLowerCase().replace(/\s+/g, ' ');
+
   for (var j = 1; j < equipData.length; j++) {
     var idInSheet = equipData[j][0].toString().trim().toLowerCase();
-    var nameInSheet = equipData[j][1].toString().trim().toLowerCase().replace(/\s+/g, ' '); // collapse whitespace/newlines
+    var nameInSheet = equipData[j][1].toString().trim().toLowerCase().replace(/\s+/g, ' ');
     
-    // Check if input matches ID or cleaned Name
-    if (idInSheet === searchId || nameInSheet === searchId || nameInSheet === scannedId.toString().trim().toLowerCase()) {
-      return equipData[j][0];
+    // Check if our candidate matches either the ID row or the Name row
+    if (idInSheet === candidateLower || nameInSheet === candidateLower) {
+      return equipData[j][0]; // EXTREMELY IMPORTANT: Return the primary ID from Column A
     }
   }
 
-  return scannedId; // Final fallback
+  return resolvedIdCandidate; // Final fallback if not found in main sheet
 }
 
 function handleIssueEquipment(studentId, scannedEquipId) {
