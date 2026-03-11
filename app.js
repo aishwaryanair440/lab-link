@@ -10,7 +10,7 @@
     // STATE & CONFIG
     // -------------------------------------------------------------------------
     const APP_STATE = {
-        apiUrl: "https://script.google.com/macros/s/AKfycbynn2cgFl24uM6llCu-D9IrfvnREVwGOoVBl24DGw_qlTmCuR9FzatYl2QgdROdAbFU/exec",
+        apiUrl: "https://script.google.com/macros/s/AKfycbzMyzEEPWqtsTB2CoQOZUTMajN0ttBysuy1zW8xcUYgFoV0wmg9UVQJpEmqCFgFNldB/exec",
         role: "student", // 'student' or 'admin'
         user: null,      // holds user details like { Student_ID: "ST...", Name: "..." }
         isDemo: false,
