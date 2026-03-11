@@ -226,38 +226,49 @@
     function renderDashboard() {
         // Render Stats
         const stats = cachedData.status;
-        $("#statAvailable").textContent = stats.available || 0;
-        $("#statInUse").textContent = stats.in_use || 0;
+        const sId = APP_STATE.user ? APP_STATE.user.Student_ID.toString().trim().toLowerCase() : "";
 
         if (APP_STATE.role === "admin") {
+            $("#statAvailable").textContent = stats.available || 0;
+            $("#statInUse").textContent = stats.in_use || 0;
             $("#statTotalEq").textContent = stats.total_equipment || 0;
-            // Calculate overdue randomly for UI or properly by date
-            let overdueCount = cachedData.transactions.filter(t => t.Return_Status === "Not Returned").length; // Simplified
+            const overdueCount = cachedData.transactions.filter(t => (t.Return_Status || "").toString().trim().toLowerCase() === "not returned").length;
             $("#statOverdue").textContent = overdueCount;
 
-            // Render Admin Rxns
             const tbody = $("#recentRxnTable tbody");
             tbody.innerHTML = cachedData.transactions.slice(-5).reverse().map(t => `
-        <tr>
-          <td>${t.Student_ID}</td>
-          <td>${t.Equipment_ID}</td>
-          <td>${formatBadge(t.Return_Status)}</td>
-          <td>${t.Issue_Time}</td>
-        </tr>`).join("");
+                <tr>
+                  <td>${t.Student_ID}</td>
+                  <td>${t.Equipment_ID}</td>
+                  <td>${formatBadge(t.Return_Status)}</td>
+                  <td>${t.Issue_Time}</td>
+                </tr>`).join("");
         } else {
             // Student specific dashboard: My Items
-            const myItems = cachedData.transactions.filter(t => t.Student_ID === APP_STATE.user.Student_ID && t.Return_Status === "Not Returned");
+            const myItems = cachedData.transactions.filter(t => {
+                const tId = (t.Student_ID || "").toString().trim().toLowerCase();
+                const tStatus = (t.Return_Status || "").toString().trim().toLowerCase();
+                return tId === sId && (tStatus === "not returned" || tStatus === "issued");
+            });
+
+            $("#statAvailable").textContent = stats.available || 0;
+            $("#statInUse").textContent = myItems.length;
+
+            // Personalize the label if it exists
+            const inUseLabel = $("#statInUse").parentElement.querySelector(".stat-label");
+            if (inUseLabel) inUseLabel.textContent = "Your Items In Use";
+
             const tbody = $("#myIssuedTable tbody");
             if (myItems.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="4" class="text-center">No active issues found.</td></tr>`;
             } else {
                 tbody.innerHTML = myItems.map(t => `
-          <tr>
-            <td><strong>${t.Transaction_ID}</strong></td>
-            <td>${t.Equipment_ID}</td>
-            <td>${t.Issue_Time}</td>
-            <td>${formatBadge(t.Return_Status)}</td>
-          </tr>`).join("");
+                    <tr>
+                      <td><strong>${t.Transaction_ID}</strong></td>
+                      <td>${t.Equipment_ID}</td>
+                      <td>${t.Issue_Time}</td>
+                      <td>${formatBadge(t.Return_Status)}</td>
+                    </tr>`).join("");
             }
         }
     }
@@ -284,10 +295,16 @@
 
     function renderTransactions() {
         const body = $("#transactionsTable tbody");
-        body.innerHTML = cachedData.transactions.slice().reverse().map(t => `
+        const sId = APP_STATE.user ? APP_STATE.user.Student_ID.toString().trim().toLowerCase() : "";
+
+        const data = APP_STATE.role === "admin"
+            ? cachedData.transactions
+            : cachedData.transactions.filter(t => (t.Student_ID || "").toString().trim().toLowerCase() === sId);
+
+        body.innerHTML = data.slice().reverse().map(t => `
       <tr>
         <td><strong>${t.Transaction_ID}</strong></td>
-        <td>${t.Student_ID}</td>
+        <td class="admin-only">${t.Student_ID}</td>
         <td>${t.Equipment_ID}</td>
         <td>${t.Issue_Time || "—"}</td>
         <td>${t.Return_Time || "—"}</td>
