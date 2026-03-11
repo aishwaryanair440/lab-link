@@ -136,10 +136,12 @@
         $("#userRoleDisplay").textContent = APP_STATE.role === "admin" ? "Lab Assistant" : "Student";
 
         if (APP_STATE.role === "admin") {
-            $$(".admin-only").forEach(el => el.classList.remove("hidden"));
+            document.body.classList.add("role-admin");
+            document.body.classList.remove("role-student");
             $("#dashboardSubtitle").textContent = "Administration Overview";
         } else {
-            $$(".admin-only").forEach(el => el.classList.add("hidden"));
+            document.body.classList.add("role-student");
+            document.body.classList.remove("role-admin");
             $("#dashboardSubtitle").textContent = "Your equipment circulation dashboard";
         }
 
@@ -154,6 +156,7 @@
         dom.appLayout.classList.add("hidden");
         $("#loginId").value = "";
         APP_STATE.user = null;
+        document.body.classList.remove("role-admin", "role-student");
     }
 
     // -------------------------------------------------------------------------

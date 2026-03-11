@@ -57,6 +57,27 @@ body {
     color: var(--primary);
 }
 
+.admin-only,
+.student-only {
+    display: none !important;
+}
+
+body.role-admin .admin-only {
+    display: block !important;
+}
+
+body.role-admin tr.admin-only {
+    display: table-row !important;
+}
+
+body.role-student .student-only {
+    display: block !important;
+}
+
+body.role-student tr.student-only {
+    display: table-row !important;
+}
+
 .text-success {
     color: var(--success);
 }
