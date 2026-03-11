@@ -10,7 +10,7 @@
     // STATE & CONFIG
     // -------------------------------------------------------------------------
     const APP_STATE = {
-        apiUrl: "https://script.google.com/macros/s/AKfycbxnXxJWUZK9QGxoBGP8KR_eINvuWCD9SggGMk5pT9Heer2qVeBNzjIgMqiCffdTM0Wy/exec",
+        apiUrl: "https://script.google.com/macros/s/AKfycbynn2cgFl24uM6llCu-D9IrfvnREVwGOoVBl24DGw_qlTmCuR9FzatYl2QgdROdAbFU/exec",
         role: "student", // 'student' or 'admin'
         user: null,      // holds user details like { Student_ID: "ST...", Name: "..." }
         isDemo: false,
@@ -375,9 +375,21 @@
     // -------------------------------------------------------------------------
     async function processIssue() {
         const studentId = $("#issueStudentId").value.trim();
-        const equipId = $("#issueEquipId").value.trim();
+        const equipInput = $("#issueEquipId").value.trim();
 
-        if (!studentId || !equipId) return showToast("Both IDs are required", "warning");
+        if (!studentId || !equipInput) return showToast("Both IDs are required", "warning");
+
+        // Automatically resolve Equipment Name to Equipment ID using local catalog
+        let resolvedEquipId = equipInput;
+        if (cachedData.equipment) {
+            const cleanInput = equipInput.toLowerCase().trim().replace(/\s+/g, ' ');
+            const match = cachedData.equipment.find(eq => {
+                const cleanName = eq.Equipment_Name.toLowerCase().trim().replace(/\s+/g, ' ');
+                const cleanID = eq.Equipment_ID.toLowerCase().trim();
+                return cleanName === cleanInput || cleanID === cleanInput;
+            });
+            if (match) resolvedEquipId = match.Equipment_ID;
+        }
 
         showLoader("Processing circulation...");
 
@@ -391,7 +403,7 @@
                 return;
             }
 
-            const res = await callApi("issue", { studentId, equipmentId: equipId });
+            const res = await callApi("issue", { studentId, equipmentId: resolvedEquipId });
             if (res.status === "success") {
                 showToast("Transaction successful!", "success");
                 $("#issueStudentId").value = $("#issueEquipId").value = "";
@@ -407,10 +419,22 @@
     }
 
     async function processReturn() {
-        const equipId = $("#returnEquipId").value.trim();
+        const equipInput = $("#returnEquipId").value.trim();
         const damage = $("#returnDamageCheck").checked ? "Yes" : "No";
 
-        if (!equipId) return showToast("Equipment ID is required", "warning");
+        if (!equipInput) return showToast("Equipment ID is required", "warning");
+
+        // Automatically resolve Equipment Name to Equipment ID using local catalog
+        let resolvedEquipId = equipInput;
+        if (cachedData.equipment) {
+            const cleanInput = equipInput.toLowerCase().trim().replace(/\s+/g, ' ');
+            const match = cachedData.equipment.find(eq => {
+                const cleanName = eq.Equipment_Name.toLowerCase().trim().replace(/\s+/g, ' ');
+                const cleanID = eq.Equipment_ID.toLowerCase().trim();
+                return cleanName === cleanInput || cleanID === cleanInput;
+            });
+            if (match) resolvedEquipId = match.Equipment_ID;
+        }
 
         showLoader("Checking in equipment...");
 
@@ -424,7 +448,7 @@
                 return;
             }
 
-            const res = await callApi("return", { equipmentId: equipId, damage: damage });
+            const res = await callApi("return", { equipmentId: resolvedEquipId, damage: damage });
             if (res.status === "success") {
                 showToast("Equipment checked in securely.", "success");
                 $("#returnEquipId").value = "";

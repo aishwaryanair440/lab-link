@@ -768,25 +768,43 @@ function handleLogin(role, id) {
 }
 
 function normalizeEquipmentIdFromBarcode(scannedId) {
-  // If the scanned ID is exactly something like EQ001, we just return it.
-  // But since the user specified a second spreadsheet for Barcode data mapping:
+  if (!scannedId) return "";
+  var searchId = scannedId.toString().trim().toLowerCase();
+  
+  // 1. Try mapping from the Barcode Spreadsheet
   try {
     var barcodeSS = getBarcodeSpreadsheet();
     if (barcodeSS) {
-      var sheet = barcodeSS.getSheets()[0]; // Assume first sheet
+      var sheet = barcodeSS.getSheets()[0];
       var data = sheet.getDataRange().getValues();
-      // Assume column 1 is Barcode, column 2 is Equipment_ID, or they match.
       for (var i = 1; i < data.length; i++) {
-        var row = data[i];
-        if (row[0] === scannedId || row[1] === scannedId || row[5] === scannedId) { // check multi columns
-           return row[0]; // Returns actual equipment ID (like EQ001)
+        // Check Barcode (col 0), ID (col 1), or any other potential ID column
+        if ((data[i][0] && data[i][0].toString().trim().toLowerCase() === searchId) || 
+            (data[i][1] && data[i][1].toString().trim().toLowerCase() === searchId)) {
+           return data[i][0]; // Returns actual equipment ID
         }
       }
     }
   } catch (e) {
     Logger.log("Barcode spreadsheet access error: " + e);
   }
-  return scannedId; // fallback
+
+  // 2. Try direct match or name match in the Main Spreadsheet
+  var ss = getSpreadsheet();
+  var equipSheet = ss.getSheetByName("Equipment");
+  var equipData = equipSheet.getDataRange().getValues();
+  
+  for (var j = 1; j < equipData.length; j++) {
+    var idInSheet = equipData[j][0].toString().trim().toLowerCase();
+    var nameInSheet = equipData[j][1].toString().trim().toLowerCase().replace(/\s+/g, ' '); // collapse whitespace/newlines
+    
+    // Check if input matches ID or cleaned Name
+    if (idInSheet === searchId || nameInSheet === searchId || nameInSheet === scannedId.toString().trim().toLowerCase()) {
+      return equipData[j][0];
+    }
+  }
+
+  return scannedId; // Final fallback
 }
 
 function handleIssueEquipment(studentId, scannedEquipId) {
