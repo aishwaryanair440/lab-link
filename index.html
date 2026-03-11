@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LabLink - University Equipment Catalogue</title>
+
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- ZXing/Html5-Qrcode for Barcode Scanning -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <!-- Local Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="opac-theme">
+
+    <!-- LOGIN OVERLAY -->
+    <div id="loginScreen" class="overlay active">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-box">
+                    <i class="fa-solid fa-microscope"></i>
+                </div>
+                <h2>LabLink Portal</h2>
+                <p>University Equipment Catalogue</p>
+            </div>
+
+            <div class="login-tabs">
+                <button class="tab-btn active" data-role="student">Student Login</button>
+                <button class="tab-btn" data-role="admin">Staff Login</button>
+            </div>
+
+            <div class="login-body">
+                <div class="input-group">
+                    <label>Authentication ID</label>
+                    <input type="text" id="loginId" placeholder="e.g. ST001 or admin" autocomplete="off">
+                </div>
+                <button id="loginBtn" class="btn btn-primary btn-block">
+                    <span>Authenticate</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+
+            <!-- API Endpoint is permanently configured -->
+
+            <div class="login-footer">
+                <button id="demoLoginBtn" class="btn btn-ghost btn-block">Use Demo Mode (Offline)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP LAYOUT -->
+    <div id="appLayout" class="layout-wrapper hidden">
+
+        <!-- HEADER -->
+        <header class="top-header">
+            <div class="header-left">
+                <button id="mobileMenuToggle" class="icon-btn"><i class="fa-solid fa-bars"></i></button>
+                <div class="brand">
+                    <i class="fa-solid fa-microscope text-primary"></i>
+                    <h1>LabLink</h1>
+                </div>
+            </div>
+            <div class="header-search">
+                <div class="search-box">
+                    <i class="fa-solid fa-search"></i>
+                    <input type="text" id="globalSearch" placeholder="Search equipment catalogue...">
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="user-profile">
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                    <div class="user-info">
+                        <span id="userNameDisplay">Student Name</span>
+                        <span id="userRoleDisplay" class="role-badge">Student</span>
+                    </div>
+                </div>
+                <button id="logoutBtn" class="icon-btn tooltip" data-tooltip="Logout"><i
+                        class="fa-solid fa-sign-out-alt"></i></button>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <!-- SIDEBAR NAVIGATION -->
+            <aside id="sidebar" class="sidebar">
+                <nav class="nav-menu">
+                    <!-- Common -->
+                    <a href="#" class="nav-item active" data-page="dashboard">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="catalogue">
+                        <i class="fa-solid fa-book"></i>
+                        <span>Equipment Catalogue</span>
+                    </a>
+
+                    <!-- Admin Only -->
+                    <div class="nav-group admin-only">
+                        <div class="nav-group-title">Circulation Desk</div>
+                        <a href="#" class="nav-item action-bg" data-page="issue">
+                            <i class="fa-solid fa-barcode"></i>
+                            <span>Issue Equipment</span>
+                        </a>
+                        <a href="#" class="nav-item action-bg" data-page="return">
+                            <i class="fa-solid fa-undo"></i>
+                            <span>Return Equipment</span>
+                        </a>
+                    </div>
+
+                    <!-- Common -->
+                    <div class="nav-group">
+                        <div class="nav-group-title">Records</div>
+                        <a href="#" class="nav-item" data-page="transactions">
+                            <i class="fa-solid fa-history"></i>
+                            <span>Transactions</span>
+                        </a>
+                        <a href="#" class="nav-item admin-only" data-page="students">
+                            <i class="fa-solid fa-users"></i>
+                            <span>Student Records</span>
+                        </a>
+                        <a href="#" class="nav-item admin-only" data-page="damage">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span>Damage Log</span>
+                        </a>
+                    </div>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <div id="connectionStatus" class="status-indicator">
+                        <div class="pulse-dot"></div>
+                        <span>System Status: Online</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- PAGE CONTENT -->
+            <main class="content-area">
+                <div id="pageContainer">
+
+                    <!-- ================= DASHBOARD PAGE ================= -->
+                    <div id="page-dashboard" class="page active">
+                        <div class="page-header">
+                            <h2>My Dashboard</h2>
+                            <p class="subtitle text-muted" id="dashboardSubtitle">Welcome to the LabLink Equipment
+                                Portal</p>
+                        </div>
+
+                        <!-- Stats Row -->
+                        <div class="stats-row">
+                            <div class="stat-box admin-only">
+                                <div class="stat-icon bg-primary-light text-primary"><i
+                                        class="fa-solid fa-boxes-stacked"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-value" id="statTotalEq">0</span>
+                                    <span class="stat-label">Total Equipment</span>
+                                </div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-icon bg-success-light text-success"><i
+                                        class="fa-solid fa-check-circle"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-value" id="statAvailable">0</span>
+                                    <span class="stat-label">Available for Issue</span>
+                                </div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-icon bg-warning-light text-warning"><i
+                                        class="fa-solid fa-hand-holding"></i></div>
+                                <div class="stat-details">
+                                    <span class="stat-value" id="statInUse">0</span>
+                                    <span class="stat-label">Currently Borrowed</span>
+                                </div>
+                            </div>
+                            <div class="stat-box admin-only">
+                                <div class="stat-icon bg-danger-light text-danger"><i class="fa-solid fa-clock"></i>
+                                </div>
+                                <div class="stat-details">
+                                    <span class="stat-value" id="statOverdue">0</span>
+                                    <span class="stat-label">Overdue Returns</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-grid">
+                            <!-- Issued Items Panel -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3><i class="fa-solid fa-bookmark text-primary"></i> Currently Issued to You</h3>
+                                </div>
+                                <div class="card-body no-padding">
+                                    <table class="opac-table" id="myIssuedTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Transaction ID</th>
+                                                <th>Equipment ID</th>
+                                                <th>Issue Time</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Populated via JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Admin Panel: Recent Global Transactions -->
+                            <div class="card admin-only">
+                                <div class="card-header">
+                                    <h3><i class="fa-solid fa-history text-primary"></i> Recent Global Transactions</h3>
+                                </div>
+                                <div class="card-body no-padding">
+                                    <table class="opac-table" id="recentRxnTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Student</th>
+                                                <th>Equipment</th>
+                                                <th>Status</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Populated via JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= CATALOGUE PAGE ================= -->
+                    <div id="page-catalogue" class="page">
+                        <div class="page-header flex-between">
+                            <div>
+                                <h2>Equipment Catalogue</h2>
+                                <p class="subtitle text-muted">Browse and search available lab equipment</p>
+                            </div>
+                            <button class="btn btn-outline" onclick="appController.refreshData()"><i
+                                    class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+                        </div>
+
+                        <div class="controls-bar">
+                            <div class="filter-group" id="equipFilters">
+                                <button class="filter-chip active" data-filter="all">All Items</button>
+                                <button class="filter-chip" data-filter="Available">Available</button>
+                                <button class="filter-chip" data-filter="In Use">In Use</button>
+                                <button class="filter-chip" data-filter="Under Repair">Under Repair</button>
+                            </div>
+                        </div>
+
+                        <div class="card table-card table-responsive">
+                            <table class="opac-table" id="catalogueTable">
+                                <thead>
+                                    <tr>
+                                        <th>Equipment ID</th>
+                                        <th>Name / Description</th>
+                                        <th>Category</th>
+                                        <th>Lab Type</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ================= ISSUE EQUIPMENT PAGE (Admin) ================= -->
+                    <div id="page-issue" class="page">
+                        <div class="page-header">
+                            <h2>Issue Equipment Checkout</h2>
+                            <p class="subtitle text-muted">Scan Student ID and Equipment ID to process circulation</p>
+                        </div>
+
+                        <div class="scanner-workflow">
+                            <div class="scanner-step card">
+                                <h4><span class="step-num">1</span> Identify Student</h4>
+                                <div class="input-action-group">
+                                    <input type="text" id="issueStudentId"
+                                        placeholder="Scan or type Student ID (e.g. ST001)">
+                                    <button class="btn btn-primary btn-icon start-scan-btn"
+                                        data-target="issueStudentId"><i class="fa-solid fa-camera"></i> Scan</button>
+                                </div>
+                            </div>
+
+                            <div class="scanner-connector"><i class="fa-solid fa-link"></i></div>
+
+                            <div class="scanner-step card">
+                                <h4><span class="step-num">2</span> Identify Equipment</h4>
+                                <div class="input-action-group">
+                                    <input type="text" id="issueEquipId" placeholder="Scan or type Equipment ID">
+                                    <button class="btn btn-primary btn-icon start-scan-btn"
+                                        data-target="issueEquipId"><i class="fa-solid fa-camera"></i> Scan</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="action-panel text-center mt-lg">
+                            <button id="submitIssueBtn" class="btn btn-success btn-large shadow-glow"><i
+                                    class="fa-solid fa-check"></i> PROCESS ISSUE TRANSACTION</button>
+                        </div>
+                    </div>
+
+                    <!-- ================= RETURN EQUIPMENT PAGE (Admin) ================= -->
+                    <div id="page-return" class="page">
+                        <div class="page-header">
+                            <h2>Return Equipment Check-in</h2>
+                            <p class="subtitle text-muted">Scan Equipment ID to register return</p>
+                        </div>
+
+                        <div class="scanner-workflow single">
+                            <div class="scanner-step card">
+                                <h4>Identify Equipment</h4>
+                                <div class="input-action-group">
+                                    <input type="text" id="returnEquipId"
+                                        placeholder="Scan or type Equipment ID (e.g. EQ001)">
+                                    <button class="btn btn-primary btn-icon start-scan-btn"
+                                        data-target="returnEquipId"><i class="fa-solid fa-camera"></i> Scan</button>
+                                </div>
+
+                                <div class="mt-md">
+                                    <label class="checkbox-container">
+                                        <input type="checkbox" id="returnDamageCheck">
+                                        <span class="checkmark"></span>
+                                        Mark as damaged or faulty during return
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="action-panel text-center mt-lg">
+                            <button id="submitReturnBtn" class="btn btn-primary btn-large shadow-glow"><i
+                                    class="fa-solid fa-undo"></i> PROCESS RETURN TRANSACTION</button>
+                        </div>
+                    </div>
+
+                    <!-- ================= TRANSACTIONS PAGE ================= -->
+                    <div id="page-transactions" class="page">
+                        <div class="page-header">
+                            <h2 id="txnTitle">Transaction History</h2>
+                        </div>
+                        <div class="card table-card table-responsive">
+                            <table class="opac-table" id="transactionsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Txn ID</th>
+                                        <th class="admin-only">Student</th>
+                                        <th>Equipment</th>
+                                        <th>Issue Time</th>
+                                        <th>Return Time</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ================= STUDENTS PAGE (Admin) ================= -->
+                    <div id="page-students" class="page">
+                        <div class="page-header">
+                            <h2>Student Records</h2>
+                        </div>
+                        <div class="card table-card table-responsive">
+                            <table class="opac-table" id="studentsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Student ID</th>
+                                        <th>Name</th>
+                                        <th>Department</th>
+                                        <th>Year</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ================= DAMAGE LOG PAGE (Admin) ================= -->
+                    <div id="page-damage" class="page">
+                        <div class="page-header">
+                            <h2>Damage & Maintenance Log</h2>
+                        </div>
+                        <div class="card table-card table-responsive">
+                            <table class="opac-table" id="damageTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Equipment</th>
+                                        <th>Reported By</th>
+                                        <th>Description</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- QR SCANNER MODAL -->
+    <div id="scannerModal" class="overlay">
+        <div class="scanner-container">
+            <div class="scanner-header flex-between">
+                <h3><i class="fa-solid fa-barcode"></i> Scan Barcode</h3>
+                <button class="icon-btn" id="closeScannerBtn"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div id="qr-reader" style="width:100%; max-width:500px"></div>
+        </div>
+    </div>
+
+    <!-- LOADER overlay -->
+    <div id="globalLoader" class="overlay hidden">
+        <div class="spinner-box">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"><i class="fa-solid fa-info-circle"></i> <span id="toastMessage"></span></div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
