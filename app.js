@@ -55,11 +55,7 @@
 
         // Login Actions
         $("#loginBtn").addEventListener("click", handleLogin);
-        $("#demoLoginBtn").addEventListener("click", () => {
-            APP_STATE.isDemo = true;
-            APP_STATE.user = APP_STATE.role === "admin" ? { Name: "Demo Admin" } : { Student_ID: "ST001", Name: "Aarav Sharma" };
-            loginSuccess();
-        });
+
 
         // Navigation
         $$(".nav-item").forEach(item => {
