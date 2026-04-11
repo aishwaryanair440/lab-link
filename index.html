@@ -11,8 +11,10 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- ZXing/Html5-Qrcode for Barcode Scanning -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- QuaggaJS — high-performance Code-128 / 1D barcode engine -->
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <!-- html5-qrcode — QR Code fallback engine -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
     <!-- Local Styles -->
     <link rel="stylesheet" href="styles.css">
@@ -404,14 +406,64 @@
         </div>
     </div>
 
-    <!-- QR SCANNER MODAL -->
-    <div id="scannerModal" class="overlay">
-        <div class="scanner-container">
-            <div class="scanner-header flex-between">
-                <h3><i class="fa-solid fa-barcode"></i> Scan Barcode</h3>
-                <button class="icon-btn" id="closeScannerBtn"><i class="fa-solid fa-times"></i></button>
+    <!-- ====== HYBRID SCANNER MODAL ====== -->
+    <div id="scannerModal" class="scanner-overlay">
+        <div class="scanner-modal-box">
+
+            <!-- Header -->
+            <div class="scanner-modal-header">
+                <div class="scanner-title">
+                    <i class="fa-solid fa-camera"></i>
+                    <span id="scannerModalTitle">Scan Code</span>
+                </div>
+                <button class="scanner-close-btn" id="closeScannerBtn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
-            <div id="qr-reader" style="width:100%; max-width:500px"></div>
+
+            <!-- Mode Tabs -->
+            <div class="scanner-mode-tabs">
+                <button class="scanner-mode-tab active" id="tabBarcode" onclick="ScannerEngine.setMode('barcode')">
+                    <i class="fa-solid fa-barcode"></i> Barcode
+                </button>
+                <button class="scanner-mode-tab" id="tabQr" onclick="ScannerEngine.setMode('qr')">
+                    <i class="fa-solid fa-qrcode"></i> QR Code
+                </button>
+            </div>
+
+            <!-- Viewport -->
+            <div class="scanner-viewport" id="scannerViewport">
+                <!-- QuaggaJS renders its own <video> + <canvas> here -->
+                <div id="quagga-container"></div>
+                <!-- html5-qrcode renders inside this div for QR mode -->
+                <div id="qr-reader" class="hidden"></div>
+
+                <!-- Scan Box Overlay -->
+                <div class="scan-box-overlay">
+                    <div class="scan-box" id="scanBox">
+                        <div class="scan-corner tl"></div>
+                        <div class="scan-corner tr"></div>
+                        <div class="scan-corner bl"></div>
+                        <div class="scan-corner br"></div>
+                        <div class="scan-laser"></div>
+                    </div>
+                </div>
+
+                <!-- Success flash -->
+                <div class="scan-success-flash" id="scanSuccessFlash"></div>
+            </div>
+
+            <!-- Instruction -->
+            <p class="scanner-instruction" id="scannerInstruction">
+                <i class="fa-solid fa-circle-info"></i>
+                Align barcode within the box
+            </p>
+
+            <!-- Result display -->
+            <div class="scanner-result hidden" id="scannerResult">
+                <i class="fa-solid fa-circle-check"></i>
+                <span id="scannerResultText"></span>
+            </div>
         </div>
     </div>
 

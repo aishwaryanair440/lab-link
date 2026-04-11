@@ -333,47 +333,235 @@
         });
     }
 
-    // -------------------------------------------------------------------------
-    // BARCODE SCANNER (html5-qrcode)
-    // -------------------------------------------------------------------------
-    function openScanner(targetInputId) {
-        APP_STATE.scanTargetInput = targetInputId;
-        dom.scannerModal.classList.add("active");
+    // =========================================================================
+    // HYBRID SCANNER ENGINE  (QuaggaJS for barcodes | html5-qrcode for QR)
+    // =========================================================================
+    const ScannerEngine = (() => {
+        let _targetInputId = null;   // Which <input> receives the scanned value
+        let _mode = 'barcode';       // 'barcode' | 'qr'
+        let _running = false;        // Prevent duplicate starts
+        let _lastCode = null;        // Duplicate-scan guard
+        let _qrInstance = null;      // html5-qrcode instance
+        let _scanLock = false;       // Brief lock after successful scan
 
-        if (!APP_STATE.scanner) {
-            // Restrict scanning formats to strictly Code-128 and QR to significantly increase scanning focus and speed
-            const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39 ];
-            APP_STATE.scanner = new Html5Qrcode("qr-reader", { formatsToSupport: formatsToSupport, verbose: false });
+        // ---- Audio feedback (tiny beep via Web Audio API) -------------------
+        function _beep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'square';
+                osc.frequency.value = 1046;   // C6
+                gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+                osc.start(); osc.stop(ctx.currentTime + 0.12);
+            } catch (e) { /* AudioContext blocked — silent fallback */ }
         }
 
-        APP_STATE.scanner.start(
-            { facingMode: "environment" },
-            { 
-                fps: 24, // Increase fps for much faster frame analysis
-                qrbox: { width: 400, height: 150 }, // Widen the box specifically for 1D wide barcodes
-                disableFlip: true // Disable flip for 1D codes saves processing power
-            },
-            (decodedText, decodedResult) => {
-                // Success
-                document.getElementById(APP_STATE.scanTargetInput).value = decodedText;
-                showToast("Barcode Scanned: " + decodedText, "success");
-                closeScanner();
-            },
-            (errorMessage) => {
-                // Continuous scanning failure - ignore safe to ignore
+        // ---- Visual success feedback ----------------------------------------
+        function _flashSuccess() {
+            const flash = document.getElementById('scanSuccessFlash');
+            if (!flash) return;
+            flash.classList.add('flash');
+            setTimeout(() => flash.classList.remove('flash'), 350);
+        }
+
+        // ---- Vibrate if available -------------------------------------------
+        function _vibrate() {
+            if (navigator.vibrate) navigator.vibrate([60, 30, 60]);
+        }
+
+        // ---- Set scan box shape for current mode ----------------------------
+        function _updateScanBox() {
+            const box = document.getElementById('scanBox');
+            if (!box) return;
+            box.className = 'scan-box ' + (_mode === 'qr' ? 'mode-qr' : 'mode-barcode');
+        }
+
+        // ---- Show result chip ------------------------------------------------
+        function _showResult(code) {
+            const resultEl = document.getElementById('scannerResult');
+            const textEl   = document.getElementById('scannerResultText');
+            if (resultEl && textEl) {
+                textEl.textContent = code;
+                resultEl.classList.remove('hidden');
             }
-        ).catch(err => {
-            showToast("Camera access denied or unvailable.", "error");
-            closeScanner();
-        });
-    }
-
-    function closeScanner() {
-        dom.scannerModal.classList.remove("active");
-        if (APP_STATE.scanner && APP_STATE.scanner.isScanning) {
-            APP_STATE.scanner.stop().catch(console.error);
         }
-    }
+
+        // ---- Called on every successful decode ------------------------------
+        function _onDetected(code) {
+            if (_scanLock || !code) return;
+            if (code === _lastCode) return;   // Ignore duplicate reads
+            _scanLock = true;
+            _lastCode = code;
+
+            _beep();
+            _vibrate();
+            _flashSuccess();
+            _showResult(code);
+
+            // Fill the target input
+            if (_targetInputId) {
+                const input = document.getElementById(_targetInputId);
+                if (input) {
+                    input.value = code;
+                    input.dispatchEvent(new Event('input')); // Trigger any listeners
+                }
+            }
+
+            showToast('Scanned: ' + code, 'success');
+
+            // Close modal after brief delay so user sees feedback
+            setTimeout(() => stop(), 600);
+        }
+
+        // ---- START QuaggaJS (barcode mode) ----------------------------------
+        function _startQuagga() {
+            const viewport = document.getElementById('scannerViewport');
+            const vw = viewport ? viewport.clientWidth  : 320;
+            const vh = viewport ? viewport.clientHeight : 240;
+
+            Quagga.init({
+                inputStream: {
+                    name: 'Live',
+                    type: 'LiveStream',
+                    target: document.getElementById('quagga-container'),
+                    constraints: {
+                        facingMode: 'environment',    // Always back camera
+                        width:  { ideal: 1280 },      // High-resolution for reliability
+                        height: { ideal: 720 },
+                        focusMode: 'continuous'
+                    },
+                    // Only decode within the center 80%×50% region (matches scan box)
+                    area: { top: '25%', right: '10%', left: '10%', bottom: '25%' }
+                },
+                decoder: {
+                    // Focus exclusively on Code-128 and Code-39 (student + equipment IDs)
+                    readers: ['code_128_reader', 'code_39_reader'],
+                    debug: { drawBoundingBox: false, showFrequency: false,
+                             drawScanline: false, showPattern: false }
+                },
+                locate: true,
+                frequency: 15    // ~15 decode attempts per second — fast without overloading
+            }, (err) => {
+                if (err) {
+                    showToast('Camera error: ' + err, 'error');
+                    stop();
+                    return;
+                }
+                Quagga.start();
+                _running = true;
+            });
+
+            Quagga.onDetected((result) => {
+                const code = result && result.codeResult && result.codeResult.code;
+                if (code) _onDetected(code);
+            });
+        }
+
+        // ---- START html5-qrcode (QR mode) -----------------------------------
+        function _startQr() {
+            const formats = [Html5QrcodeSupportedFormats.QR_CODE];
+            _qrInstance = new Html5Qrcode('qr-reader', { formatsToSupport: formats, verbose: false });
+
+            _qrInstance.start(
+                { facingMode: 'environment' },
+                { fps: 20, qrbox: { width: 220, height: 220 }, disableFlip: true },
+                (decodedText) => { _onDetected(decodedText); },
+                () => {}   // Ignore per-frame decode errors
+            ).catch((err) => {
+                showToast('Camera error: ' + err, 'error');
+                stop();
+            });
+            _running = true;
+        }
+
+        // ---- Stop all scanning engines ---------------------------------------
+        function stop() {
+            // Stop QuaggaJS
+            try { Quagga.stop(); } catch (e) {}
+            try { Quagga.offDetected(); } catch (e) {}
+
+            // Stop html5-qrcode
+            if (_qrInstance) {
+                _qrInstance.stop().catch(() => {}).finally(() => { _qrInstance = null; });
+            }
+
+            _running  = false;
+            _scanLock = false;
+            _lastCode = null;
+
+            // Hide modal
+            document.getElementById('scannerModal').classList.remove('active');
+
+            // Clear QR reader DOM so it can restart fresh
+            const qrEl = document.getElementById('qr-reader');
+            if (qrEl) qrEl.innerHTML = '';
+        }
+
+        // ---- Switch between barcode / QR modes --------------------------------
+        function setMode(newMode) {
+            if (_running) stop();   // Tear down current engine first
+
+            _mode = newMode;
+            _updateScanBox();
+
+            // Update tab UI
+            document.getElementById('tabBarcode').classList.toggle('active', newMode === 'barcode');
+            document.getElementById('tabQr').classList.toggle('active', newMode === 'qr');
+
+            // Update instruction text
+            const instr = document.getElementById('scannerInstruction');
+            if (instr) instr.innerHTML = newMode === 'qr'
+                ? '<i class="fa-solid fa-circle-info"></i> Align QR code within the box'
+                : '<i class="fa-solid fa-circle-info"></i> Align barcode within the box';
+
+            // Show / hide containers
+            document.getElementById('quagga-container').classList.toggle('hidden', newMode === 'qr');
+            document.getElementById('qr-reader').classList.toggle('hidden', newMode === 'barcode');
+
+            // Restart in new mode
+            if (newMode === 'qr') _startQr(); else _startQuagga();
+        }
+
+        // ---- Public open entry point -----------------------------------------
+        function open(targetInputId) {
+            if (_running) stop();    // Always clean restart
+
+            _targetInputId = targetInputId;
+            _lastCode      = null;
+            _scanLock      = false;
+            _mode          = 'barcode';   // Default to barcode mode
+
+            // Reset result chip
+            const resultEl = document.getElementById('scannerResult');
+            if (resultEl) resultEl.classList.add('hidden');
+
+            // Update scan-box shape
+            _updateScanBox();
+            document.getElementById('quagga-container').classList.remove('hidden');
+            document.getElementById('qr-reader').classList.add('hidden');
+            document.getElementById('tabBarcode').classList.add('active');
+            document.getElementById('tabQr').classList.remove('active');
+
+            // Update modal title
+            const title = document.getElementById('scannerModalTitle');
+            if (title) title.textContent = 'Scanning for ' + targetInputId
+                .replace('issueStudentId','Student ID')
+                .replace('issueEquipId','Equipment ID')
+                .replace('returnEquipId','Equipment ID');
+
+            document.getElementById('scannerModal').classList.add('active');
+            _startQuagga();
+        }
+
+        return { open, stop, setMode };
+    })();
+
+    // ---- Thin wrappers so existing call sites don't need changing ----------
+    function openScanner(targetInputId) { ScannerEngine.open(targetInputId); }
+    function closeScanner()             { ScannerEngine.stop(); }
 
     // -------------------------------------------------------------------------
     // ACTIONS (Issue / Return)

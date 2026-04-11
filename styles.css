@@ -800,11 +800,213 @@ body.role-student tr.student-only {
     font-size: 1.25rem;
 }
 
-#qr-reader {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
+/* =========================================================
+   HYBRID SCANNER MODAL
+   ========================================================= */
+
+/* Full-screen dark overlay */
+.scanner-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    padding: 16px;
+}
+.scanner-overlay.active { display: flex; }
+
+/* Modal card */
+.scanner-modal-box {
+    background: #0f172a;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 480px;
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header bar */
+.scanner-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: #1e293b;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.scanner-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+}
+.scanner-title i { color: var(--primary); font-size: 1.2rem; }
+.scanner-close-btn {
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: #94a3b8;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+}
+.scanner-close-btn:hover { background: rgba(255,255,255,0.15); color: white; }
+
+/* Mode tabs */
+.scanner-mode-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px;
+    background: #1e293b;
+}
+.scanner-mode-tab {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.scanner-mode-tab.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+/* Camera viewport */
+.scanner-viewport {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #000;
     overflow: hidden;
 }
+/* Quagga video element fills viewport */
+#quagga-container { width: 100%; height: 100%; }
+#quagga-container video,
+#quagga-container canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+}
+/* Make QuaggaJS drawingCanvas transparent so video shows through */
+#quagga-container canvas.drawingBuffer { opacity: 0.5; }
+
+/* QR mode container */
+#qr-reader {
+    width: 100%;
+    height: 100%;
+    border: none !important;
+}
+#qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+#qr-reader img { display: none !important; }
+
+/* Darkened border overlay with transparent scan-box cutout */
+.scan-box-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+/* The bright scan box */
+.scan-box {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+}
+/* Barcode mode: wide & short */
+.scan-box.mode-barcode { width: 85%; height: 120px; }
+/* QR mode: square */
+.scan-box.mode-qr { width: 220px; height: 220px; }
+
+/* Corner markers */
+.scan-corner {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-color: #00e5ff;
+    border-style: solid;
+    border-width: 0;
+}
+.scan-corner.tl { top: 0; left: 0;  border-top-width: 3px; border-left-width: 3px;  border-top-left-radius: 4px; }
+.scan-corner.tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 4px; }
+.scan-corner.bl { bottom: 0; left: 0;  border-bottom-width: 3px; border-left-width: 3px;  border-bottom-left-radius: 4px; }
+.scan-corner.br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 4px; }
+
+/* Laser sweep line */
+.scan-laser {
+    position: absolute;
+    left: 4px; right: 4px;
+    height: 2px;
+    background: linear-gradient(to right, transparent, #00e5ff, transparent);
+    box-shadow: 0 0 8px #00e5ff, 0 0 16px rgba(0,229,255,0.5);
+    animation: laserSweep 1.8s ease-in-out infinite;
+    top: 0;
+}
+@keyframes laserSweep {
+    0%   { top: 0%;   opacity: 1; }
+    50%  { top: 96%;  opacity: 1; }
+    100% { top: 0%;   opacity: 1; }
+}
+
+/* Success green flash */
+.scan-success-flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(14, 159, 110, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s;
+}
+.scan-success-flash.flash { opacity: 1; }
+
+/* Instruction text */
+.scanner-instruction {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.82rem;
+    padding: 10px 16px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.scanner-instruction i { color: #00e5ff; }
+
+/* Result chip */
+.scanner-result {
+    margin: 8px 16px 16px;
+    background: rgba(14, 159, 110, 0.15);
+    border: 1px solid var(--success);
+    border-radius: 8px;
+    color: var(--success);
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 
 /* LOADER */
 .spinner-box {
