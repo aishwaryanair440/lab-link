@@ -721,5 +721,9 @@
     // Expose controller for global inline calls (like refresh btn)
     window.appController = { refreshData, processIssue, processReturn };
 
+    // Expose ScannerEngine globally so inline onclick handlers in index.html work
+    // (e.g. onclick="ScannerEngine.setMode('barcode')")
+    window.ScannerEngine = ScannerEngine;
+
     document.addEventListener("DOMContentLoaded", init);
 })();
