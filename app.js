@@ -341,12 +341,18 @@
         dom.scannerModal.classList.add("active");
 
         if (!APP_STATE.scanner) {
-            APP_STATE.scanner = new Html5Qrcode("qr-reader");
+            // Restrict scanning formats to strictly Code-128 and QR to significantly increase scanning focus and speed
+            const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39 ];
+            APP_STATE.scanner = new Html5Qrcode("qr-reader", { formatsToSupport: formatsToSupport, verbose: false });
         }
 
         APP_STATE.scanner.start(
             { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 100 } },
+            { 
+                fps: 24, // Increase fps for much faster frame analysis
+                qrbox: { width: 400, height: 150 }, // Widen the box specifically for 1D wide barcodes
+                disableFlip: true // Disable flip for 1D codes saves processing power
+            },
             (decodedText, decodedResult) => {
                 // Success
                 document.getElementById(APP_STATE.scanTargetInput).value = decodedText;

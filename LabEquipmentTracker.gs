@@ -423,44 +423,13 @@ function generateBarcodesForEquipment(spreadsheet) {
   var sheet = spreadsheet.getSheetByName("Equipment");
   var lastRow = sheet.getLastRow();
 
-  Logger.log("📊 Generating barcodes for " + (lastRow - 1) + " equipment items...");
+  Logger.log("📊 Generating barcodes for " + (lastRow - 1) + " equipment items using IMAGE formulas...");
 
   for (var row = 2; row <= lastRow; row++) {
-    var equipmentId = sheet.getRange(row, 1).getValue(); // Equipment_ID column
-
-    try {
-      // Use the barcodeapi.org public API to generate Code-128 barcodes
-      // Alternative APIs you can use:
-      //   - https://barcode.tec-it.com/barcode.ashx?data=EQ001&code=Code128&translate-esc=on
-      //   - https://bwipjs-api.metafloor.com/?bcid=code128&text=EQ001
-      var barcodeUrl = "https://bwipjs-api.metafloor.com/?bcid=code128&text=" +
-                        encodeURIComponent(equipmentId) +
-                        "&scale=2&height=12&includetext";
-
-      // Fetch the barcode image from the API
-      var response = UrlFetchApp.fetch(barcodeUrl);
-      var blob = response.getBlob().setName(equipmentId + "_barcode.png");
-
-      // Insert the barcode image into the cell
-      // CellImageBuilder places images inside cells (available in newer Sheets)
-      var image = SpreadsheetApp.newCellImage()
-                    .setSourceUrl(barcodeUrl)
-                    .setAltTextTitle(equipmentId + " Barcode")
-                    .setAltTextDescription("Code-128 barcode for " + equipmentId)
-                    .build();
-
-      sheet.getRange(row, 7).setValue(image);
-
-      Logger.log("  ✅ Barcode generated for " + equipmentId);
-
-      // Small delay to avoid API rate limiting (200ms between requests)
-      Utilities.sleep(200);
-
-    } catch (e) {
-      // If barcode generation fails, log the error and put a placeholder
-      Logger.log("  ⚠️ Failed to generate barcode for " + equipmentId + ": " + e.message);
-      sheet.getRange(row, 7).setValue("Barcode Error - " + e.message);
-    }
+    // We use the reliable tec-it API directly within a Sheet IMAGE formula
+    // This offloads rendering to the browser and prevents Google Apps Script execution time limits
+    var formula = '=IMAGE("https://barcode.tec-it.com/barcode.ashx?data=" & A' + row + ' & "&code=Code128")';
+    sheet.getRange(row, 7).setFormula(formula);
   }
 
   Logger.log("✅ Barcode generation complete.");
@@ -517,26 +486,9 @@ function createBarcodeFolder(spreadsheet) {
     labelsSheet.getRange(rowNum, 1).setValue(equipmentName);
     labelsSheet.getRange(rowNum, 2).setValue(equipmentId);
 
-    // Generate and insert barcode image
-    try {
-      var barcodeUrl = "https://bwipjs-api.metafloor.com/?bcid=code128&text=" +
-                        encodeURIComponent(equipmentId) +
-                        "&scale=2&height=12&includetext";
-
-      var image = SpreadsheetApp.newCellImage()
-                    .setSourceUrl(barcodeUrl)
-                    .setAltTextTitle(equipmentId + " Barcode")
-                    .setAltTextDescription("Code-128 barcode for " + equipmentId)
-                    .build();
-
-      labelsSheet.getRange(rowNum, 3).setValue(image);
-
-      Utilities.sleep(200);
-
-    } catch (e) {
-      labelsSheet.getRange(rowNum, 3).setValue("Error: " + e.message);
-      Logger.log("  ⚠️ Label barcode error for " + equipmentId + ": " + e.message);
-    }
+    // Generate and insert barcode image using formula for ultimate reliability without rate-limits
+    var formula = '=IMAGE("https://barcode.tec-it.com/barcode.ashx?data=" & B' + rowNum + ' & "&code=Code128")';
+    labelsSheet.getRange(rowNum, 3).setFormula(formula);
 
     // Set row height for barcode visibility
     labelsSheet.setRowHeight(rowNum, 70);
