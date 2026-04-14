@@ -1,41 +1,13 @@
-// ============================================================================
-// LAB EQUIPMENT TRACKING SYSTEM - Google Apps Script
-// ============================================================================
-// This script automatically creates a complete backend for tracking lab
-// equipment, students, transactions, damage reports, and bookings.
-//
-// HOW TO USE:
-// 1. Open Google Apps Script: https://script.google.com
-// 2. Create a new project and paste this entire code.
-// 3. Run the "setupLabEquipmentSystem" function to generate everything.
-// 4. Authorize the script when prompted (it needs Drive & Sheets access).
-// 5. Deploy as Web App to enable the JSON API endpoint.
-//
-// FEATURES:
-// - Creates a "Lab Equipment Database" Google Sheet with 5 tabs
-// - Populates mock data for Students (30+), Equipment (40+)
-// - Generates Code-128 barcodes for each equipment item
-// - Creates a "Lab Equipment Barcodes" folder in Google Drive
-// - Generates a printable "Barcode Labels" sheet
-// - Exposes a Web API endpoint returning equipment data as JSON
-// ============================================================================
-
-
-// ============================================================================
-// SECTION 1: MAIN SETUP FUNCTION
-// ============================================================================
-// This is the entry point. Run this function to set up everything.
-// It orchestrates the creation of sheets, data population, and barcode generation.
 
 function setupLabEquipmentSystem() {
   Logger.log("🚀 Starting Lab Equipment Tracking System setup...");
 
-  // Step 1: Create the main spreadsheet
+ 
   var spreadsheet = SpreadsheetApp.create("Lab Equipment Database");
   var spreadsheetId = spreadsheet.getId();
   Logger.log("✅ Created spreadsheet: " + spreadsheet.getUrl());
 
-  // Step 2: Set up each sheet tab with headers and data
+ 
   setupStudentsSheet(spreadsheet);
   setupEquipmentSheet(spreadsheet);
   setupTransactionsSheet(spreadsheet);
@@ -43,16 +15,16 @@ function setupLabEquipmentSystem() {
   setupBookingSheet(spreadsheet);
   setupStudentBarcodesPrintSheet(spreadsheet);
 
-  // Remove the default "Sheet1" that Google creates automatically
+  
   var defaultSheet = spreadsheet.getSheetByName("Sheet1");
   if (defaultSheet) {
     spreadsheet.deleteSheet(defaultSheet);
   }
 
-  // Step 3: Generate barcodes for equipment items
+ 
   generateBarcodesForEquipment(spreadsheet);
 
-  // Step 4: Create barcode folder and labels sheet in Google Drive
+  
   createBarcodeFolder(spreadsheet);
 
   Logger.log("🎉 Setup complete! Open your Google Drive to find your files.");
